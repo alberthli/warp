@@ -483,7 +483,12 @@ def volume_grad(volume: wp.uint64, p: wp.vec3):
 
 
 @wp.func
-def counter_increment(counter: wp.array(dtype=int), counter_index: int, tids: wp.array(dtype=int), tid: int):
+def counter_increment(
+    counter: wp.array(dtype=int),
+    counter_index: int,
+    tids: wp.array(dtype=int),
+    tid: int,
+):
     # increment counter, remember which thread received which counter value
     next_count = wp.atomic_add(counter, counter_index, 1)
     tids[tid] = next_count
@@ -491,13 +496,22 @@ def counter_increment(counter: wp.array(dtype=int), counter_index: int, tids: wp
 
 
 @wp.func_replay(counter_increment)
-def replay_counter_increment(counter: wp.array(dtype=int), counter_index: int, tids: wp.array(dtype=int), tid: int):
+def replay_counter_increment(
+    counter: wp.array(dtype=int),
+    counter_index: int,
+    tids: wp.array(dtype=int),
+    tid: int,
+):
     return tids[tid]
 
 
 @wp.func
 def limited_counter_increment(
-    counter: wp.array(dtype=int), counter_index: int, tids: wp.array(dtype=int), tid: int, index_limit: int
+    counter: wp.array(dtype=int),
+    counter_index: int,
+    tids: wp.array(dtype=int),
+    tid: int,
+    index_limit: int,
 ):
     # increment counter but only if it is smaller than index_limit, remember which thread received which counter value
     next_count = wp.atomic_add(counter, counter_index, 1)
@@ -510,7 +524,11 @@ def limited_counter_increment(
 
 @wp.func_replay(limited_counter_increment)
 def replay_limited_counter_increment(
-    counter: wp.array(dtype=int), counter_index: int, tids: wp.array(dtype=int), tid: int, index_limit: int
+    counter: wp.array(dtype=int),
+    counter_index: int,
+    tids: wp.array(dtype=int),
+    tid: int,
+    index_limit: int,
 ):
     return tids[tid]
 
@@ -597,7 +615,13 @@ def create_soft_contacts(
 
         min_scale = wp.min(geo_scale)
         if wp.mesh_query_point_sign_normal(
-            mesh, wp.cw_div(x_local, geo_scale), margin + radius / min_scale, sign, face_index, face_u, face_v
+            mesh,
+            wp.cw_div(x_local, geo_scale),
+            margin + radius / min_scale,
+            sign,
+            face_index,
+            face_u,
+            face_v,
         ):
             shape_p = wp.mesh_eval_position(mesh, face_index, face_u, face_v)
             shape_v = wp.mesh_eval_velocity(mesh, face_index, face_u, face_v)
@@ -737,7 +761,9 @@ def count_contact_points(
         return  # no plane-plane contacts
     else:
         wp.printf(
-            "count_contact_points: unsupported geometry type combination %d and %d\n", actual_type_a, actual_type_b
+            "count_contact_points: unsupported geometry type combination %d and %d\n",
+            actual_type_a,
+            actual_type_b,
         )
 
     wp.atomic_add(contact_count, 0, num_contacts)
@@ -1068,7 +1094,13 @@ def handle_contact_pairs(
             sign = float(0.0)
             max_dist = (thickness + rigid_contact_margin) / min_scale_b
             res = wp.mesh_query_point_sign_normal(
-                mesh_b, wp.cw_div(query_b_local, geo_scale_b), max_dist, sign, face_index, face_u, face_v
+                mesh_b,
+                wp.cw_div(query_b_local, geo_scale_b),
+                max_dist,
+                sign,
+                face_index,
+                face_u,
+                face_v,
             )
             if res:
                 shape_p = wp.mesh_eval_position(mesh_b, face_index, face_u, face_v)
@@ -1103,9 +1135,11 @@ def handle_contact_pairs(
         p_b_body = closest_point_box(geo_scale_b, query_b)
         p_b_world = wp.transform_point(X_ws_b, p_b_body)
         diff = p_a_world - p_b_world
-        # use center of box A to query normal to make sure we are not inside B
-        query_b = wp.transform_point(X_sw_b, wp.transform_get_translation(X_ws_a))
-        normal = wp.transform_vector(X_ws_b, box_sdf_grad(geo_scale_b, query_b))
+
+        # normal should point perp to box since closest_point_box projects in l-inf norm
+        normal = wp.normalize(diff)
+        if box_sdf(geo_scale_b, query_b) < 0.0:
+            normal = -normal
         distance = wp.dot(diff, normal)
 
     elif geo_type_a == wp.sim.GEO_BOX and geo_type_b == wp.sim.GEO_CAPSULE:
@@ -1219,7 +1253,11 @@ def handle_contact_pairs(
         max_dist = (rigid_contact_margin + thickness) / min_scale_b
         mesh_b = geo.source[shape_b]
         u = closest_edge_coordinate_mesh(
-            mesh_b, wp.cw_div(edge0_b, geo_scale_b), wp.cw_div(edge1_b, geo_scale_b), max_iter, max_dist
+            mesh_b,
+            wp.cw_div(edge0_b, geo_scale_b),
+            wp.cw_div(edge1_b, geo_scale_b),
+            max_iter,
+            max_dist,
         )
         p_a_world = (1.0 - u) * edge0_world + u * edge1_world
         query_b_local = wp.transform_point(X_sw_b, p_a_world)
@@ -1230,7 +1268,13 @@ def handle_contact_pairs(
         face_v = float(0.0)
         sign = float(0.0)
         res = wp.mesh_query_point_sign_normal(
-            mesh_b, wp.cw_div(query_b_local, geo_scale_b), max_dist, sign, face_index, face_u, face_v
+            mesh_b,
+            wp.cw_div(query_b_local, geo_scale_b),
+            max_dist,
+            sign,
+            face_index,
+            face_u,
+            face_v,
         )
         if res:
             shape_p = wp.mesh_eval_position(mesh_b, face_index, face_u, face_v)
@@ -1327,7 +1371,13 @@ def handle_contact_pairs(
         face_v = float(0.0)
         sign = float(0.0)
         res = wp.mesh_query_point_sign_normal(
-            mesh_b, wp.cw_div(query_b_local, geo_scale_b), max_dist, sign, face_index, face_u, face_v
+            mesh_b,
+            wp.cw_div(query_b_local, geo_scale_b),
+            max_dist,
+            sign,
+            face_index,
+            face_u,
+            face_v,
         )
 
         if res:
@@ -1358,7 +1408,13 @@ def handle_contact_pairs(
         max_dist = (rigid_contact_margin + thickness) / min_scale
 
         res = wp.mesh_query_point_sign_normal(
-            mesh_b, wp.cw_div(query_b_local, geo_scale_b), max_dist, sign, face_index, face_u, face_v
+            mesh_b,
+            wp.cw_div(query_b_local, geo_scale_b),
+            max_dist,
+            sign,
+            face_index,
+            face_u,
+            face_v,
         )
 
         if res:
@@ -1424,7 +1480,13 @@ def handle_contact_pairs(
         contact_thickness[index] = thickness
 
 
-def collide(model, state, edge_sdf_iter: int = 10, iterate_mesh_vertices: bool = True, requires_grad: bool = None):
+def collide(
+    model,
+    state,
+    edge_sdf_iter: int = 10,
+    iterate_mesh_vertices: bool = True,
+    requires_grad: bool = None,
+):
     """
     Generates contact points for the particles and rigid bodies in the model,
     to be used in the contact dynamics kernel of the integrator.
