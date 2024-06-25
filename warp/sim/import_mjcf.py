@@ -219,7 +219,7 @@ def parse_mjcf(
         faces = []
         vertices = []
         stl_file = mesh_assets[geom["mesh"]]
-        m = trimesh.load(stl_file)
+        m = trimesh.load(stl_file, force="mesh")
 
         for v in m.vertices:
             vertices.append(np.array(v) * scale)
